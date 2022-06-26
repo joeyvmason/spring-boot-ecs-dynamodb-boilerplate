@@ -1,0 +1,48 @@
+on: [push, workflow_dispatch]
+jobs:
+  aws_cdk:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+      - uses: actions/setup-node@v2
+        with:
+          node-version: "18"
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: '17'
+      - name: Set up Maven cache
+        uses: actions/cache@v1
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Maven build
+        run: mvn clean package
+      - name: Configure aws credentials
+        uses: aws-actions/configure-aws-credentials@master
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_KEY }}
+          aws-region: 'us-west-2'
+      - name: Install CDK
+        run: npm install -g aws-cdk@2.27.0
+      - name: Install dependencies
+        run: npm install
+        working-directory: .cdk
+#      - name: Bootstrap CDK # Run this exactly once -- only for brand new AWS accounts
+#        run: cdk bootstrap
+#        working-directory: .cdk
+      - name: Synth stack
+        run: cdk synth
+        working-directory: .cdk
+#      - name: Deploy stack
+#        run: cdk deploy --all --require-approval never
+#        working-directory: .cdk
+      - name: Destroy stack
+        run: cdk destroy --all --force
+        working-directory: .cdk
